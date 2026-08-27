@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "reviewed": "2026-08-03",
+  "sourceUrls": {
+    "Solana Foundation": "https://solana.org/delegation-program",
+    "The Vault": "https://thevault.finance",
+    "Phase Delegation": "https://www.phase.cc/delegation",
+    "dynoSOL": "https://www.dynosol.io",
+    "Jag Pool": "https://www.jagpool.xyz",
+    "Jito": "https://www.jito.network/staking/",
+    "DoubleZero": "https://doublezero.xyz/staking",
+    "SOL Strategies": "https://app.solstrategies.io",
+    "Shinobi": "https://xshin.fi"
+  },
+  "pools": [
+    {
+      "name": "Solana Foundation Delegation Program",
+      "token": null,
+      "summary": "The Foundation delegates SOL to eligible validators to support decentralization. Not a stake pool, but the largest single delegation source.",
+      "howToApply": "Register at solana.org/delegation-program: run a testnet node, complete KYC, and onboard via the SFDP CLI. Mainnet delegation follows once testnet criteria are met.",
+      "requirements": [
+        "Testnet node meeting baseline criteria in ≥5 of the last 10 testnet epochs",
+        "Report metrics in 8 of the last 10 epochs on both testnet and mainnet",
+        "Commission ≤10% on mainnet",
+        "From May 2026: ASN/hosting provider <25% of network stake and data-center concentration <15%",
+        "No transaction-ordering manipulation or censorship (enforced from May 2026)"
+      ],
+      "url": "https://solana.org/delegation-criteria"
+    },
+    {
+      "name": "The Vault",
+      "token": "vSOL",
+      "summary": "Community stake pool where undirected stake splits between Gauges, Direct Stake Leaders, and an Elite Performance bucket.",
+      "howToApply": "Apply on The Vault Discord; a community-elected Validator Board reviews every application before allowlisting.",
+      "requirements": [
+        "Uptime ≥97.5%",
+        "Commission ≤5% base and ≤10% MEV",
+        "0/0 commission required for the Elite Performance bucket",
+        "Optionally direct stake through vSOL and hold $V (or incentivize gauge votes) to earn more"
+      ],
+      "url": "https://docs.thevault.finance/delegation/get-stake-from-the-pool"
+    },
+    {
+      "name": "Jito (StakeNet Steward)",
+      "token": "JitoSOL",
+      "summary": "Fully on-chain, permissionless delegation: the Steward program scores all validators each 10-epoch cycle and splits the pool equally among the top ~400.",
+      "howToApply": "No application — run a qualifying validator with the Jito-Solana client and the Steward includes you automatically when your score ranks top 400. Track your score on the StakeNet dashboard.",
+      "requirements": [
+        "MEV commission ≤10% and priority-fee distribution via TipRouter",
+        "Low inflation commission (top scoring tier)",
+        "Vote on ≥70% of expected slots (delinquency removal)",
+        "No commission rugs — triggers instant unstake"
+      ],
+      "url": "https://www.jito.network/docs/jitosol/jitosol-liquid-staking/stake-pool-operations/delegation-criteria/"
+    },
+    {
+      "name": "Marinade (SAM)",
+      "token": "mSOL",
+      "summary": "100% of Marinade's TVL is distributed through the Stake Auction Marketplace: validators bid yield to win stake each epoch.",
+      "howToApply": "Permissionless: fund a Protected Staking Rewards (PSR) bond on-chain, then place SAM bids. Stake follows the best effective yield offered.",
+      "requirements": [
+        "Funded PSR bond (~1 SOL per 1,000 SOL of stake) as collateral",
+        "Effective commission ≤7% after bid offsets",
+        "Bond covers reward loss from commission raises or extended downtime"
+      ],
+      "url": "https://docs.marinade.finance/marinade-protocol/protocol-overview/stake-auction-market"
+    },
+    {
+      "name": "BlazeStake (SolBlaze)",
+      "token": "bSOL",
+      "summary": "Liquid staking with Custom Liquid Staking (CLS): stakers can direct their bSOL-backing stake 1:1 to a chosen validator; BLZE gauges add more.",
+      "howToApply": "No formal application for the base pool — eligible validators are included automatically. Promote CLS deposits to your validator; contact SolBlaze for custom delegation strategies.",
+      "requirements": [
+        "Validator must be online (delinquent validators are excluded)",
+        "Must not take 100% of staking rewards in fees"
+      ],
+      "url": "https://stake-docs.solblaze.org/features/custom-liquid-staking"
+    },
+    {
+      "name": "JPool",
+      "token": "JSOL",
+      "summary": "Smart Delegation Strategy re-evaluates validators every epoch and redistributes stake every 5 epochs; 30% of the pool goes to Community Good validators.",
+      "howToApply": "Automatic once your validator meets the inclusion criteria (check with the Smart Validator Toolkit). Ecosystem builders can apply separately for Community Good status via the CG form.",
+      "requirements": [
+        "Meet JPool performance and reliability criteria (checked every epoch)",
+        "Not on Solana Foundation or Jito Foundation blocklists",
+        "Community Good track: demonstrate ecosystem impact (scored by committee)"
+      ],
+      "url": "https://docs.jpool.one/for-validator-operators/how-to-join-jpool-delegation-program"
+    },
+    {
+      "name": "Sanctum (own LST)",
+      "token": "yourSOL",
+      "summary": "Every validator automatically has a Sanctum Automated LST — a liquid token for stake delegated to you. Claiming it unlocks branding and routing.",
+      "howToApply": "Claim by signing an off-chain message with your identity key (solana sign-offchain-message SANCTUMLSTCLAIM) and completing verification with Sanctum.",
+      "requirements": [
+        "≥1,000 SOL external stake for Router inclusion",
+        "5% management fee on staking yield (half returned to the validator)",
+        "Optional block-reward sharing with LST holders per your published policy"
+      ],
+      "url": "https://sanctum.so/blog/sanctum-automated-lst"
+    }
+  ]
+}

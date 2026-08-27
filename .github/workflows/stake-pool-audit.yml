@@ -1,0 +1,58 @@
+name: Stake pool directory audit
+
+# Re-reads every page cited by stake-pools.json and opens a PR when
+# the published terms have drifted. Runs weekly; also runnable on demand.
+on:
+  schedule:
+    # Mondays 06:00 UTC. Cron on GitHub is best-effort and can be delayed
+    # during peak load, which is fine for a weekly freshness check.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+# Least privilege: the job needs to push a branch and open a PR.
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: stake-pool-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # No dependencies to install — the script uses built-in fetch.
+      - name: Propose and judge directory changes
+        id: audit
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AUDIT_MODEL: claude-sonnet-5
+          AUDIT_JUDGE_MODEL: claude-sonnet-5
+          AUDIT_REPORT: ${{ runner.temp }}/stake-pool-audit.md
+        run: node scripts/audit-stake-pools.mjs
+
+      - name: Open pull request
+        if: steps.audit.outputs.edits != '0'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/stake-pool-directory-refresh
+          base: main
+          title: 'chore: refresh stake pool directory'
+          body-path: ${{ runner.temp }}/stake-pool-audit.md
+          commit-message: 'chore: refresh stake pool directory from live pages'
+          labels: automated, directory
+          delete-branch: true
+          add-paths: stake-pools.json
+
+      # Even with nothing to change, surface the findings in the run log
+      # so link rot and low-confidence drift are still visible.
+      - name: Report
+        if: always()
+        run: cat "${{ runner.temp }}/stake-pool-audit.md" >> "$GITHUB_STEP_SUMMARY" || true
