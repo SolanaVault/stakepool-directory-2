@@ -29,7 +29,11 @@ const API_KEY = process.env.ANTHROPIC_API_KEY;
 
 /** Page text beyond this is noise for our purposes and costs tokens. */
 const MAX_PAGE_CHARS = 14_000;
+const MIN_PAGE_CHARS = 200;
 const FETCH_TIMEOUT_MS = 20_000;
+const MODEL_TIMEOUT_MS = 60_000;
+const BLOCKED_PAGE_PATTERN =
+  /just a moment|enable javascript(?: and cookies)?|verify (?:that )?you are human|checking your browser|cf-chl-|attention required|access denied/i;
 
 /** Thrown when the key is out of credit — we stop cleanly, not loudly. */
 class OutOfCreditError extends Error {}
@@ -44,7 +48,7 @@ async function fetchText(url) {
       headers: {
         // Some doc hosts serve a JS shell or 403 to unknown agents.
         'user-agent':
-          'Mozilla/5.0 (compatible; validator-metrics-directory-audit/1.0; +https://github.com/SolanaVault/stakepool-directory)',
+          'Mozilla/5.0 (compatible; validator-metrics-directory-audit/1.0; +https://github.com/SolanaVault/stakepool-directory-2)',
         accept: 'text/html,application/xhtml+xml',
       },
     });
@@ -52,7 +56,8 @@ async function fetchText(url) {
       return { ok: false, status: res.status, text: '' };
     }
     const html = await res.text();
-    return { ok: true, status: res.status, text: htmlToText(html) };
+    const text = htmlToText(html);
+    return { ok: true, status: res.status, text, blocked: BLOCKED_PAGE_PATTERN.test(text) };
   } catch (err) {
     return { ok: false, status: 0, text: '', error: String(err?.message ?? err) };
   } finally {
@@ -69,6 +74,7 @@ async function fetchText(url) {
 const BLOCKED_STATUSES = new Set([401, 403, 405, 406, 429, 503]);
 
 function classify(res) {
+  if (res.blocked) return 'blocked';
   if (res.ok) return 'ok';
   if (BLOCKED_STATUSES.has(res.status)) return 'blocked';
   if (res.status === 0) return 'error';
@@ -96,6 +102,16 @@ const FIELD_NAMES = ['summary', 'howToApply', 'requirements', 'url'];
 const PROPOSAL_SCHEMA = {
   type: 'object',
   properties: {
+    pageStatus: {
+      type: 'string',
+      enum: ['usable', 'insufficient'],
+      description:
+        'usable = the fetched text contains enough relevant source material to compare. insufficient = it is an empty shell, irrelevant page, or lacks enough source material to assess the stored entry.',
+    },
+    notes: {
+      type: 'string',
+      description: 'Briefly describe the overall finding or why the page is insufficient.',
+    },
     suggestions: {
       type: 'array',
       maxItems: FIELD_NAMES.length,
@@ -125,7 +141,7 @@ const PROPOSAL_SCHEMA = {
       },
     },
   },
-  required: ['suggestions'],
+  required: ['pageStatus', 'notes', 'suggestions'],
   additionalProperties: false,
 };
 
@@ -159,44 +175,55 @@ const JUDGMENT_SCHEMA = {
 };
 
 async function callClaude({ model, system, schema, user }) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 2000,
-      temperature: 0,
-      system,
-      tools: [
-        {
-          name: 'report',
-          description: 'Return the structured audit result.',
-          input_schema: schema,
-        },
-      ],
-      tool_choice: { type: 'tool', name: 'report' },
-      messages: [{ role: 'user', content: user }],
-    }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'x-api-key': API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 2000,
+        system,
+        tools: [
+          {
+            name: 'report',
+            description: 'Return the structured audit result.',
+            input_schema: schema,
+          },
+        ],
+        tool_choice: { type: 'tool', name: 'report' },
+        messages: [{ role: 'user', content: user }],
+      }),
+    });
 
-  if (!res.ok) {
-    const body = await res.text();
-    if (/credit|quota|billing/i.test(body) || res.status === 402) {
-      throw new OutOfCreditError(`Anthropic API ${res.status}: ${body.slice(0, 300)}`);
+    if (!res.ok) {
+      const body = await res.text();
+      if (/credit|quota|billing/i.test(body) || res.status === 402) {
+        throw new OutOfCreditError(`Anthropic API ${res.status}: ${body.slice(0, 300)}`);
+      }
+      throw new Error(`Anthropic API ${res.status}: ${body.slice(0, 300)}`);
     }
-    throw new Error(`Anthropic API ${res.status}: ${body.slice(0, 300)}`);
-  }
 
-  const json = await res.json();
-  const block = json.content?.find((c) => c.type === 'tool_use');
-  if (block == null) {
-    throw new Error('Model returned no tool_use block');
+    const json = await res.json();
+    const block = json.content?.find((content) => content.type === 'tool_use');
+    if (block == null) {
+      throw new Error('Model returned no tool_use block');
+    }
+    return block.input;
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error(`Anthropic request timed out after ${MODEL_TIMEOUT_MS / 1000} seconds`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-  return block.input;
 }
 
 async function proposeChanges(pool, page) {
@@ -206,7 +233,8 @@ async function proposeChanges(pool, page) {
     system:
       'You are the proposer in the first round of a stake-pool directory audit. Compare the stored entry with the cited page and list candidate field corrections. ' +
       'Suggest at most one complete replacement per field. Focus on factual differences, not stylistic improvements. ' +
-      'A detail missing from marketing copy is not proof that it is false. Never invent requirements, URLs, or numbers that are absent from the page.',
+      'A detail missing from marketing copy is not proof that it is false. Never invent requirements, URLs, or numbers that are absent from the page. ' +
+      'Mark the page insufficient and return no suggestions when the fetched text is an empty shell, irrelevant, or does not contain enough information for a real comparison. Do not call an entry current merely because evidence is absent.',
     user:
       `Stored directory entry:\n\`\`\`json\n${JSON.stringify(pool, null, 2)}\n\`\`\`\n\n` +
       `Current text of ${pool.url}:\n"""\n${page}\n"""\n\n` +
@@ -297,24 +325,38 @@ async function main() {
   const rows = [];
   let edits = 0;
   let ranOut = false;
+  let proposerCalls = 0;
+  let judgeCalls = 0;
 
   for (const pool of directory.pools) {
     const page = await fetchText(pool.url);
-    if (!page.ok) {
-      const kind = classify(page);
+    const kind = classify(page);
+    if (kind !== 'ok') {
       rows.push({
         name: pool.name,
         status: kind === 'blocked' ? 'blocked' : 'unreachable',
         notes:
           kind === 'blocked'
-            ? `${pool.url} refused a scripted request (HTTP ${page.status}) — likely bot protection, not a dead link. Not audited this run.`
+            ? `${pool.url} returned bot protection or refused a scripted request (HTTP ${page.status}). Not audited this run.`
             : `Could not fetch ${pool.url} (${page.error ?? `HTTP ${page.status}`}). Check whether the page moved.`,
+      });
+      continue;
+    }
+
+    if (page.text.length < MIN_PAGE_CHARS) {
+      rows.push({
+        name: pool.name,
+        status: 'unverifiable',
+        proposed: 0,
+        notes: `The fetched page contained only ${page.text.length} characters of usable text.`,
+        changed: [],
       });
       continue;
     }
 
     let proposal;
     try {
+      proposerCalls += 1;
       proposal = await proposeChanges(pool, page.text);
     } catch (err) {
       if (err instanceof OutOfCreditError) {
@@ -326,13 +368,30 @@ async function main() {
       continue;
     }
 
-    const suggestions = normalizeSuggestions(proposal.suggestions);
-    if (!Array.isArray(proposal.suggestions) || suggestions.length !== proposal.suggestions.length) {
+    const suggestions = normalizeSuggestions(proposal?.suggestions);
+    const proposalEnvelopeIsValid =
+      proposal != null &&
+      ['usable', 'insufficient'].includes(proposal.pageStatus) &&
+      typeof proposal.notes === 'string' &&
+      Array.isArray(proposal.suggestions) &&
+      suggestions.length === proposal.suggestions.length &&
+      (proposal.pageStatus === 'usable' || suggestions.length === 0);
+    if (!proposalEnvelopeIsValid) {
       rows.push({
         name: pool.name,
         status: 'proposal error',
-        proposed: Array.isArray(proposal.suggestions) ? proposal.suggestions.length : '—',
+        proposed: Array.isArray(proposal?.suggestions) ? proposal.suggestions.length : '—',
         notes: 'Round one returned an invalid or duplicate field suggestion; nothing was changed.',
+        changed: [],
+      });
+      continue;
+    }
+    if (proposal.pageStatus === 'insufficient') {
+      rows.push({
+        name: pool.name,
+        status: 'unverifiable',
+        proposed: 0,
+        notes: proposal.notes,
         changed: [],
       });
       continue;
@@ -342,7 +401,7 @@ async function main() {
         name: pool.name,
         status: 'current',
         proposed: 0,
-        notes: 'Round one suggested no changes.',
+        notes: proposal.notes || 'Round one suggested no changes.',
         changed: [],
       });
       continue;
@@ -350,6 +409,7 @@ async function main() {
 
     let judgment;
     try {
+      judgeCalls += 1;
       judgment = await judgeChanges(pool, page.text, suggestions);
     } catch (err) {
       if (err instanceof OutOfCreditError) {
@@ -367,7 +427,7 @@ async function main() {
       continue;
     }
 
-    const decisions = normalizeDecisions(judgment.decisions, suggestions.length);
+    const decisions = normalizeDecisions(judgment?.decisions, suggestions.length);
     const changed = applyApprovedChanges(pool, suggestions, { decisions });
     const hasUnresolved =
       decisions.length !== suggestions.length || decisions.some((decision) => decision.confidence !== 'high');
@@ -403,20 +463,35 @@ async function main() {
     await writeFile(DATA_PATH, `${JSON.stringify(directory, null, 2)}\n`, 'utf8');
   }
 
-  await writeFile(REPORT_PATH, renderReport({ rows, linkRows, edits, ranOut }), 'utf8');
-  console.log(`Audited ${rows.length} entries; ${edits} updated. Report: ${REPORT_PATH}`);
+  await writeFile(
+    REPORT_PATH,
+    renderReport({ rows, linkRows, edits, ranOut, totalEntries: directory.pools.length }),
+    'utf8',
+  );
+  const statusCounts = new Map();
+  for (const row of rows) statusCounts.set(row.status, (statusCounts.get(row.status) ?? 0) + 1);
+  const statusSummary = [...statusCounts].map(([status, count]) => `${status}=${count}`).join(', ');
+  console.log(`Processed ${rows.length}/${directory.pools.length} entries; ${edits} updated.`);
+  console.log(`Model calls: proposer=${proposerCalls}, judge=${judgeCalls}. Statuses: ${statusSummary}.`);
+  console.log(`Report: ${REPORT_PATH}`);
   if (process.env.GITHUB_OUTPUT) {
     await writeFile(process.env.GITHUB_OUTPUT, `edits=${edits}\n`, { flag: 'a' });
   }
 }
 
-function renderReport({ rows, linkRows, edits, ranOut }) {
+function renderReport({ rows, linkRows, edits, ranOut, totalEntries }) {
   const lines = [];
+  const completedStatuses = new Set(['current', 'unchanged', 'drifted', 'drifted + review', 'review']);
+  const completed = rows.filter((row) => completedStatuses.has(row.status)).length;
   lines.push('## Stake pool directory audit', '');
   lines.push(
     edits > 0
       ? `The two-round audit approved changes to **${edits}** entr${edits === 1 ? 'y' : 'ies'}. The applied changes are in the diff.`
       : 'The two-round audit applied no meaningfully different, high-confidence changes.',
+    '',
+  );
+  lines.push(
+    `Coverage: **${completed}/${totalEntries}** entries reached semantic review; **${totalEntries - completed}** were blocked, unverifiable, errored, or not reached.`,
     '',
   );
   if (ranOut) {

@@ -22,11 +22,12 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
+          package-manager-cache: false
 
       # No dependencies to install — the script uses built-in fetch.
       - name: Propose and judge directory changes
@@ -40,7 +41,7 @@ jobs:
 
       - name: Open pull request
         if: steps.audit.outputs.edits != '0'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: chore/stake-pool-directory-refresh
           base: main
@@ -55,4 +56,9 @@ jobs:
       # so link rot and low-confidence drift are still visible.
       - name: Report
         if: always()
-        run: cat "${{ runner.temp }}/stake-pool-audit.md" >> "$GITHUB_STEP_SUMMARY" || true
+        run: |
+          if [[ -f "${{ runner.temp }}/stake-pool-audit.md" ]]; then
+            tee -a "$GITHUB_STEP_SUMMARY" < "${{ runner.temp }}/stake-pool-audit.md"
+          else
+            echo "Audit report was not created." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
