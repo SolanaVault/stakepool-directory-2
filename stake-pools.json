@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "reviewed": "2026-08-28",
+  "reviewed": "2026-08-31",
   "sourceUrls": {
     "Solana Foundation": "https://solana.org/delegation-program",
     "The Vault": "https://thevault.finance",
@@ -30,13 +30,12 @@
     {
       "name": "The Vault",
       "token": "vSOL",
-      "summary": "Community stake pool where undirected stake splits between Gauges, Direct Stake Leaders, and an Elite Performance bucket.",
-      "howToApply": "Apply on The Vault Discord; a community-elected Validator Board reviews every application before allowlisting.",
+      "summary": "Community stake pool where undirected stake is split 90% to allowlisted validators and 10% to the gauges reserve.",
+      "howToApply": "Contact The Vault team on Discord to be considered for allowlisting; there is a described Validator Application Process page but no mention of a community-elected Validator Board.",
       "requirements": [
-        "Uptime ≥97.5%",
-        "Commission ≤5% base and ≤10% MEV",
-        "0/0 commission required for the Elite Performance bucket",
-        "Optionally direct stake through vSOL and hold $V (or incentivize gauge votes) to earn more"
+        "Meet Solana Foundation Delegation Criteria (SFDC): not part of super-minority, maximum commission, vote credits, decentralization, minimum validator client version",
+        "Operate using the Jito MEV client with max MEV commission equal to SFDC's maximum validator commission",
+        "Meet at least one of: be a dApp team running a validator, have an active community involved in validator operations, or have a proven track record contributing to the Solana ecosystem"
       ],
       "url": "https://docs.thevault.finance/delegation/get-stake-from-the-pool"
     },
@@ -92,7 +91,7 @@
       "name": "Sanctum (own LST)",
       "token": "yourSOL",
       "summary": "Note: This program has been deprecated (as of the blog post). Historically, every validator automatically received a Sanctum Automated LST — a liquid token for stake delegated to them. Claiming it unlocked branding and routing benefits.",
-      "howToApply": "Claim by signing an off-chain message with your identity key (solana sign-offchain-message SANCTUMLSTCLAIM) and completing verification with Sanctum.",
+      "howToApply": "Claim by signing an off-chain message with your identity key (solana sign-offchain-message SANCTUMLSTCLAIM --keypair <IDENTITY_KEYPAIR_PATH>) and then filling out the provided form to complete the claim verification process with Sanctum.",
       "requirements": [
         "5% management fee on staking yield (half returned to the validator)",
         "Optional block-reward sharing with LST holders per your published policy"
