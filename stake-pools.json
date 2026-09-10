@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "reviewed": "2026-08-28",
+  "reviewed": "2026-09-07",
   "sourceUrls": {
     "Solana Foundation": "https://solana.org/delegation-program",
     "The Vault": "https://thevault.finance",
@@ -22,6 +22,7 @@
         "Testnet node meeting baseline criteria in ≥5 of the last 10 testnet epochs",
         "Report all metrics throughout the epoch on both testnet and mainnet",
         "Commission ≤5% on mainnet",
+        "Vote credits at least 97% of cluster average (no more than 3% fewer than cluster average)",
         "From May 2026: ASN/hosting provider <25% of network stake and data-center concentration <15%",
         "Adherence to transaction processing/infrastructure standards (transaction-ordering manipulation or censorship prohibited)"
       ],
