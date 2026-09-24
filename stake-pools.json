@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "reviewed": "2026-09-07",
+  "reviewed": "2026-09-23",
   "sourceUrls": {
     "Solana Foundation": "https://solana.org/delegation-program",
     "The Vault": "https://thevault.finance",
@@ -20,24 +20,26 @@
       "howToApply": "Register at solana.org/delegation-program: run a testnet node, complete KYC, and onboard via the SFDP CLI. Mainnet delegation follows once testnet criteria are met.",
       "requirements": [
         "Testnet node meeting baseline criteria in ≥5 of the last 10 testnet epochs",
-        "Report all metrics throughout the epoch on both testnet and mainnet",
+        "Report all metrics throughout the epoch on both testnet and mainnet (Agave validators only)",
         "Commission ≤5% on mainnet",
+        "Maximum Jito MEV commission ≤10% on mainnet",
         "Vote credits at least 97% of cluster average (no more than 3% fewer than cluster average)",
+        "Total stake of 1,000,000 SOL or less to remain eligible",
         "From May 2026: ASN/hosting provider <25% of network stake and data-center concentration <15%",
-        "Adherence to transaction processing/infrastructure standards (transaction-ordering manipulation or censorship prohibited)"
+        "Must run required minimum validator software versions (Solana/Agave, Frankendancer, Firedancer) as published on a rolling schedule",
+        "5-epoch average skip rate must not exceed 5% + cluster average skip rate (for matching stake)"
       ],
       "url": "https://solana.org/delegation-criteria"
     },
     {
       "name": "The Vault",
       "token": "vSOL",
-      "summary": "Community stake pool where undirected stake splits between Gauges, Direct Stake Leaders, and an Elite Performance bucket.",
-      "howToApply": "Apply on The Vault Discord; a community-elected Validator Board reviews every application before allowlisting.",
+      "summary": "Community stake pool where undirected stake is split 90% to allowlisted validators and 10% to a gauges reserve.",
+      "howToApply": "Contact The Vault team on Discord to apply for allowlisting as a validator.",
       "requirements": [
-        "Uptime ≥97.5%",
-        "Commission ≤5% base and ≤10% MEV",
-        "0/0 commission required for the Elite Performance bucket",
-        "Optionally direct stake through vSOL and hold $V (or incentivize gauge votes) to earn more"
+        "Meet standard Solana Foundation Delegation Criteria (SFDC): not part of super-minority, maximum commission, vote credits, decentralization, minimum client version",
+        "Operate using the Jito MEV client with maximum MEV commission equal to the SFDC's maximum validator commission",
+        "Meet at least one of: be a dApp team running a validator, have an actively involved community, or have a proven track record contributing to the Solana ecosystem"
       ],
       "url": "https://docs.thevault.finance/delegation/get-stake-from-the-pool"
     },
@@ -93,9 +95,10 @@
       "name": "Sanctum (own LST)",
       "token": "yourSOL",
       "summary": "Note: This program has been deprecated (as of the blog post). Historically, every validator automatically received a Sanctum Automated LST — a liquid token for stake delegated to them. Claiming it unlocked branding and routing benefits.",
-      "howToApply": "Claim by signing an off-chain message with your identity key (solana sign-offchain-message SANCTUMLSTCLAIM) and completing verification with Sanctum.",
+      "howToApply": "Claim by signing an off-chain message with your identity keypair (solana sign-offchain-message SANCTUMLSTCLAIM --keypair <IDENTITY_KEYPAIR_PATH>) and then filling out the provided form to complete the claim process with Sanctum.",
       "requirements": [
         "5% management fee on staking yield (half returned to the validator)",
+        "0.10% withdrawal fee charged to stakers to mitigate economic attacks",
         "Optional block-reward sharing with LST holders per your published policy"
       ],
       "url": "https://sanctum.so/blog/sanctum-automated-lst"
